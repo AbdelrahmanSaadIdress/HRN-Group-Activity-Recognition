@@ -91,7 +91,7 @@ class Person_Activity_DataSet(Dataset):
     
             api.upload_file(
                 path_or_fileobj=self.weights_path,
-                path_in_repo=os.path.basename(self.weights_path),
+                path_in_repo=f"persons_{os.path.basename(self.weights_path)}",
                 repo_id=self.huggingface_repo_id,
                 token=token
             )
