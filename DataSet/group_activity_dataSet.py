@@ -71,6 +71,9 @@ class Group_Activity_DataSet(Dataset):
         return samples
 
     def save_weights(self):
+        if self.weights_path is None:
+            return
+
         os.makedirs(os.path.dirname(self.weights_path), exist_ok=True)
     
         if self.weights is None:
@@ -123,7 +126,11 @@ class Group_Activity_DataSet(Dataset):
                 player_crop = self.transform(image=np.array(player_crop))['image']   
             players_crops.append(player_crop)
 
-        return torch.stack(players_crops) if players_crops else torch.empty(0)
+        if not players_crops:
+            # Return empty tensor with correct shape [0, C, H, W] so collate_fn doesn't crash
+            sample_shape = players_crops[0].shape if players_crops else (3, 224, 224)
+            return torch.empty(0, *sample_shape)
+        return torch.stack(players_crops)
 
     def __len__(self):
         return len(self.samples)

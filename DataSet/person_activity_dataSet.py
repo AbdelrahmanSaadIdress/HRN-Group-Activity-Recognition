@@ -2,6 +2,7 @@ import os
 import pickle
 from random import sample
 from PIL import Image
+from typing import List
 import torch
 import numpy as np
 from torch.utils.data import Dataset
@@ -43,11 +44,15 @@ class Person_Activity_DataSet(Dataset):
                 raise ValueError(f"Video ID {video_id} not found in annotations.")
             video_data = self.videos_annot[video_id]
             for seq_id, seq_data in video_data.items():
-                # if self.weights is None:
-                #     self.weights_count[self.labels[group_label]] += 1.0
                 if self.seq:
                     frames_pathes, players_boxes = [], []
                 for frame_id, frame_data in seq_data['frames_boxes_dct'].items():
+                    # Count weights at dataset creation time (not lazily at __getitem__)
+                    if self.weights is None:
+                        for player_info in frame_data:
+                            player_activity_label = self.labels.get(player_info.category)
+                            if player_activity_label is not None:
+                                self.weights_count[player_activity_label] += 1.0
                     if self.seq == True:
                         frames_pathes.append(
                             os.path.join(self.videos_path, video_id, seq_id, f"{frame_id}.jpg")
@@ -66,6 +71,9 @@ class Person_Activity_DataSet(Dataset):
         return samples
 
     def save_weights(self):
+        if self.weights_path is None:
+            return
+
         os.makedirs(os.path.dirname(self.weights_path), exist_ok=True)
     
         if self.weights is None:
@@ -102,8 +110,6 @@ class Person_Activity_DataSet(Dataset):
         for player_info in players_info:
             x1, y1, x2, y2 = player_info.xMin, player_info.yMin, player_info.xMax, player_info.yMax
             player_activity_label = self.labels.get(player_info.category)
-            if self.weights is None and player_activity_label is not None:
-                self.weights_count[player_activity_label] += 1.0
             # add a check to ensure the bounding box is within the image dimensions
             w, h = img.size
             x1 = max(0, x1)
@@ -118,7 +124,10 @@ class Person_Activity_DataSet(Dataset):
             players_crops.append(player_crop)
             players_labels.append(player_activity_label)
 
-        return torch.stack(players_crops) if players_crops else torch.empty(0), torch.tensor(players_labels, dtype=torch.long)
+        if not players_crops:
+            # Return empty tensors with correct shapes so collate_fn doesn't crash
+            return torch.empty(0, 3, 224, 224), torch.empty(0, dtype=torch.long)
+        return torch.stack(players_crops), torch.tensor(players_labels, dtype=torch.long)
 
     def __len__(self):
         return len(self.samples)
@@ -126,8 +135,8 @@ class Person_Activity_DataSet(Dataset):
     def __getitem__(self, idx):
         sample = self.samples[idx]
 
-        frames: torch.List[torch.Tensor] = []   # each: [N, 3, H, W]
-        labels: torch.List[torch.Tensor] = []  # each: [N]
+        frames: List[torch.Tensor] = []   # each: [N, 3, H, W]
+        labels: List[torch.Tensor] = []   # each: [N]
 
         for frame_path, players_info in zip(
             sample["frames_pathes"],
@@ -167,13 +176,13 @@ def person_collate_fn(batch, ignore_index=-100):
             video[i, t, :n] = frame[:n]
             target[i, t, :n] = frame_labels[:n]
 
-    
     video = video.squeeze(1)
     target = target.squeeze(1)
 
-    if video.shape[1] == 9:
-        return video, target[:,-1]
-    
+    # For seq=True, return only the last frame's labels (shape: [B, MAX_PLAYERS])
+    if T_max > 1:
+        return video, target[:, -1]
+
     return video, target
 
 # ✅ seq=False
