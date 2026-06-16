@@ -1,10 +1,4 @@
 import argparse
-from scripts.B1_NoRelations import (
-    train_stage_one,
-    test_stage_one,
-    train_stage_two,
-    test_stage_two,
-)
 from utils import load_config
 
 
@@ -31,8 +25,13 @@ def main():
     args = parse_args()
     config = load_config(args.config)
 
-    if args.model == "B1_NoRelations":
-
+    if args.model == "B1-NoRelations":
+        from scripts.B1_NoRelations import (
+            train_stage_one,
+            test_stage_one,
+            train_stage_two,
+            test_stage_two,
+        )
         if args.mode == "train" and args.stage == 1:
             train_stage_one(config, checkpoint_path=args.checkpoint)
 
@@ -50,6 +49,39 @@ def main():
                 checkpoint_path=args.checkpoint,
             )
 
+        elif args.mode == "test" and args.stage == 2:
+            if args.checkpoint is None:
+                raise ValueError("--checkpoint is required for testing.")
+            test_stage_two(config, checkpoint_path=args.checkpoint)
+
+    elif args.model == "RCRG-1R-1C":
+        from scripts.RCRG_1R_1C import (
+            train_stage_two,
+            test_stage_two,
+        )
+        if args.mode == "train" and args.stage == 2:
+            if args.stage1_checkpoint is None:
+                raise ValueError("--stage1_checkpoint is required for stage 2 training.")
+            train_stage_two(
+                config,
+                stage1_checkpoint=args.stage1_checkpoint,
+                checkpoint_path=args.checkpoint,
+            )
+        elif args.mode == "test" and args.stage == 2:
+            if args.checkpoint is None:
+                raise ValueError("--checkpoint is required for testing.")
+            test_stage_two(config, checkpoint_path=args.checkpoint)
+    
+    elif args.model == "RCRG-1R-1C-untuned":
+        from scripts.RCRG_1R_1C_untuned import (
+            train_stage_two,
+            test_stage_two,
+        )
+        if args.mode == "train" and args.stage == 2:
+            train_stage_two(
+                config,
+                checkpoint_path=args.checkpoint,
+            )
         elif args.mode == "test" and args.stage == 2:
             if args.checkpoint is None:
                 raise ValueError("--checkpoint is required for testing.")

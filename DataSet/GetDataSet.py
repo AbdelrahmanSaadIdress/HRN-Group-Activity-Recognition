@@ -93,4 +93,27 @@ def get_dataloader(config: dict, state: Literal["train", "val", "test"]):
 
             return dataset, group_collate_fn
 
-    
+    if config["About"]["name"] in ["RCRG-1R-1C", "RCRG-1R-1C-untuned"]:
+        video_path = config["Data"]["frames_annots_path"]
+        annot_path = os.path.join(config["Data"]["annotations_path"], "data.pkl")
+        seq = False
+        sort=True
+        split = config["Modelling"]["data_splits"][state]
+        labels = group_activity_labels
+        weights_path = os.path.join(config["Data"]["weights_path"], config["Data"]["group_weights"], f"{state}_weights.pkl")
+        transform = get_transform(state)
+        repo_id = config['About']['repo_id']
+
+        dataset = Group_Activity_DataSet(
+            videos_path=video_path, 
+            annot_path=annot_path, 
+            seq=seq, 
+            sort=sort,
+            split=split, 
+            labels=labels, 
+            transform=transform,
+            weights_path=weights_path,
+            huggingface_repo_id=repo_id
+        )
+
+        return dataset, group_collate_fn
