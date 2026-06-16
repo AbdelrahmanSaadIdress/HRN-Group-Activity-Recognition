@@ -3,11 +3,17 @@ from utils import load_config
 
 
 def parse_args():
+
+    models_names_choices_list = [
+        "B1-NoRelations",
+        "RCRG-1R-1C", "RCRG-1R-1C-untuned",
+        "RCRG-2R-11C-conc", "RCRG-2R-11C"]
+
     parser = argparse.ArgumentParser(description="HRN Group Activity Recognition")
 
     parser.add_argument("--mode",       type=str, required=True,  choices=["train", "test"],
                         help="train or test")
-    parser.add_argument("--model",      type=str, required=True,  choices=["B1_NoRelations"],
+    parser.add_argument("--model",      type=str, required=True,  choices=models_names_choices_list,
                         help="which model to run")
     parser.add_argument("--stage",      type=int, required=True,  choices=[1, 2],
                         help="which stage of the model")
@@ -80,6 +86,38 @@ def main():
         if args.mode == "train" and args.stage == 2:
             train_stage_two(
                 config,
+                checkpoint_path=args.checkpoint,
+            )
+        elif args.mode == "test" and args.stage == 2:
+            if args.checkpoint is None:
+                raise ValueError("--checkpoint is required for testing.")
+            test_stage_two(config, checkpoint_path=args.checkpoint)
+
+    elif args.model == "RCRG-2R-11C-conc":
+        from scripts.RCRG_2R_11C_conc import (
+            train_stage_two,
+            test_stage_two,
+        )
+        if args.mode == "train" and args.stage == 2:
+            train_stage_two(
+                config,
+                stage1_checkpoint=args.stage1_checkpoint,
+                checkpoint_path=args.checkpoint,
+            )
+        elif args.mode == "test" and args.stage == 2:
+            if args.checkpoint is None:
+                raise ValueError("--checkpoint is required for testing.")
+            test_stage_two(config, checkpoint_path=args.checkpoint)
+
+    elif args.model == "RCRG-2R-11C":
+        from scripts.RCRG_2R_11C import (
+            train_stage_two,
+            test_stage_two,
+        )
+        if args.mode == "train" and args.stage == 2:
+            train_stage_two(
+                config,
+                stage1_checkpoint=args.stage1_checkpoint,
                 checkpoint_path=args.checkpoint,
             )
         elif args.mode == "test" and args.stage == 2:

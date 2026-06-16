@@ -41,8 +41,6 @@ def get_transform(state: Literal["train", "val", "test"]):
 
 
 def get_dataloader(config: dict, state: Literal["train", "val", "test"]):
-    annotations = AnnotationPreparer.load_annotations(config["Data"]["annotations_path"])
-    
     # B1-NoRelations
     if config["About"]["name"] == "B1-NoRelations":
         if config["About"]["level"] == "person":
@@ -93,7 +91,7 @@ def get_dataloader(config: dict, state: Literal["train", "val", "test"]):
 
             return dataset, group_collate_fn
 
-    if config["About"]["name"] in ["RCRG-1R-1C", "RCRG-1R-1C-untuned"]:
+    if config["About"]["name"] in ["RCRG-1R-1C", "RCRG-1R-1C-untuned", "RCRG-2R-11C_conc", "RCRG-2R-11C"]:
         video_path = config["Data"]["frames_annots_path"]
         annot_path = os.path.join(config["Data"]["annotations_path"], "data.pkl")
         seq = False
