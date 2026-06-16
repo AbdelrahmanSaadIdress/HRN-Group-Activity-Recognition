@@ -70,21 +70,21 @@ class RCRG_2R_11C_conc_stage2(nn.Module):
 
         return x
 
-# Create Stage 1 model
-stage1_model = b1_norelations_stage1(num_classes=9)
-# Create Stage 2 model
-model = RCRG_2R_11C_conc_stage2(stage1_model)
-# Random input
-B = 2
-P = 12
-x = torch.randn(B, P, 3, 224, 224)
+# # Create Stage 1 model
+# stage1_model = b1_norelations_stage1(num_classes=9)
+# # Create Stage 2 model
+# model = RCRG_2R_11C_conc_stage2(stage1_model)
+# # Random input
+# B = 2
+# P = 12
+# x = torch.randn(B, P, 3, 224, 224)
 
-# Forward pass
-with torch.no_grad():
-    out = model(x)
+# # Forward pass
+# with torch.no_grad():
+#     out = model(x)
 
-print("Input shape :", x.shape)
-print("Output shape:", out.shape)
+# print("Input shape :", x.shape)
+# print("Output shape:", out.shape)
 
 
 
