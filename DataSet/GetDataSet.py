@@ -91,7 +91,7 @@ def get_dataloader(config: dict, state: Literal["train", "val", "test"]):
 
             return dataset, group_collate_fn
 
-    if config["About"]["name"] in ["RCRG-1R-1C", "RCRG-1R-1C-untuned", "RCRG-2R-11C_conc", "RCRG-2R-11C"]:
+    if config["About"]["name"] in ["RCRG-1R-1C", "RCRG-1R-1C-untuned", "RCRG-2R-11C-conc", "RCRG-2R-11C", "RCRG-2R-21C-conc", "RCRG-2R-21C", "RCRG-3R-421C-conc", "RCRG-3R-421C"]:
         video_path = config["Data"]["frames_annots_path"]
         annot_path = os.path.join(config["Data"]["annotations_path"], "data.pkl")
         seq = False

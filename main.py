@@ -7,7 +7,10 @@ def parse_args():
     models_names_choices_list = [
         "B1-NoRelations",
         "RCRG-1R-1C", "RCRG-1R-1C-untuned",
-        "RCRG-2R-11C-conc", "RCRG-2R-11C"]
+        "RCRG-2R-11C-conc", "RCRG-2R-11C", 
+        "RCRG-2R-21C-conc", "RCRG-2R-21C",
+        "RCRG-3R-421C-conc", "RCRG-3R-421C"
+        ]
 
     parser = argparse.ArgumentParser(description="HRN Group Activity Recognition")
 
@@ -111,6 +114,70 @@ def main():
 
     elif args.model == "RCRG-2R-11C":
         from scripts.RCRG_2R_11C import (
+            train_stage_two,
+            test_stage_two,
+        )
+        if args.mode == "train" and args.stage == 2:
+            train_stage_two(
+                config,
+                stage1_checkpoint=args.stage1_checkpoint,
+                checkpoint_path=args.checkpoint,
+            )
+        elif args.mode == "test" and args.stage == 2:
+            if args.checkpoint is None:
+                raise ValueError("--checkpoint is required for testing.")
+            test_stage_two(config, checkpoint_path=args.checkpoint)
+
+    elif args.model == "RCRG-2R-21C-conc":
+        from scripts.RCRG_2R_21C_conc import (
+            train_stage_two,
+            test_stage_two,
+        )
+        if args.mode == "train" and args.stage == 2:
+            train_stage_two(
+                config,
+                stage1_checkpoint=args.stage1_checkpoint,
+                checkpoint_path=args.checkpoint,
+            )
+        elif args.mode == "test" and args.stage == 2:
+            if args.checkpoint is None:
+                raise ValueError("--checkpoint is required for testing.")
+            test_stage_two(config, checkpoint_path=args.checkpoint)
+
+    elif args.model == "RCRG-2R-21C":
+        from scripts.RCRG_2R_21C import (
+            train_stage_two,
+            test_stage_two,
+        )
+        if args.mode == "train" and args.stage == 2:
+            train_stage_two(
+                config,
+                stage1_checkpoint=args.stage1_checkpoint,
+                checkpoint_path=args.checkpoint,
+            )
+        elif args.mode == "test" and args.stage == 2:
+            if args.checkpoint is None:
+                raise ValueError("--checkpoint is required for testing.")
+            test_stage_two(config, checkpoint_path=args.checkpoint)
+
+    elif args.model == "RCRG-3R-421C-conc":
+        from scripts.RCRG_3R_421C_conc import (
+            train_stage_two,
+            test_stage_two,
+        )
+        if args.mode == "train" and args.stage == 2:
+            train_stage_two(
+                config,
+                stage1_checkpoint=args.stage1_checkpoint,
+                checkpoint_path=args.checkpoint,
+            )
+        elif args.mode == "test" and args.stage == 2:
+            if args.checkpoint is None:
+                raise ValueError("--checkpoint is required for testing.")
+            test_stage_two(config, checkpoint_path=args.checkpoint)
+
+    elif args.model == "RCRG-3R-421C":
+        from scripts.RCRG_3R_421C import (
             train_stage_two,
             test_stage_two,
         )
