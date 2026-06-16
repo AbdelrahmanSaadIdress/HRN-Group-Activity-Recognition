@@ -23,8 +23,8 @@ class Group_Activity_DataSet(Dataset):
         self.weights_path = weights_path
         self.huggingface_repo_id = huggingface_repo_id
         self.weights = True if (weights_path is not None and os.path.exists(weights_path)) else None
-        if self.weights is None:
-            self.weights_count = {label: 0.0 for label in self.labels.values()}
+        # if self.weights is None:
+        self.weights_count = {label: 0.0 for label in self.labels.values()}
         self.videos_annot = self.load_data()
         self.samples = self.create_samples()
 
@@ -46,8 +46,8 @@ class Group_Activity_DataSet(Dataset):
                 group_label = seq_data['category']
                 if group_label not in self.labels:
                     raise ValueError(f"Group activity label {group_label} not found in labels dictionary.")
-                if self.weights is None:
-                    self.weights_count[self.labels[group_label]] += 1.0
+                # if self.weights is None:
+                self.weights_count[self.labels[group_label]] += 1.0
                 if self.seq:
                     frames_pathes, players_boxes = [], []
                 for frame_id, frame_data in seq_data['frames_boxes_dct'].items():
@@ -97,12 +97,12 @@ class Group_Activity_DataSet(Dataset):
             )
     
     def get_weights(self):
-        if self.weights is not None:
-            with open(self.weights_path, "rb") as f:
-                weights = pickle.load(f)
-            return weights
-        else:
-            return self.weights_count
+        # if self.weights is not None:
+        #     with open(self.weights_path, "rb") as f:
+        #         weights = pickle.load(f)
+        #     return weights
+        # else:
+        return self.weights_count
 
     def get_players_crops(self, img, players_info):
         if self.sort:
