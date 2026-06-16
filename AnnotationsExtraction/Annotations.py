@@ -111,23 +111,19 @@ class AnnotationPreparer:
         return matches_dict
 
     @staticmethod
-    def load_annotations(save_path: str = '/kaggle/working/') -> Dict[str, Any]:
-        """
-        Loads prepared annotations from the pickle file.
+    def load_annotations(save_path: str):
+        from AnnotationsExtraction.BoxInfo import BoxInfo
+        import pickle
 
-        Parameters
-        ----------
-        save_path : str
-            Directory containing `data.pkl`.
+        class FixedUnpickler(pickle.Unpickler):
+            def find_class(self, module, name):
+                if name == 'BoxInfo':
+                    return BoxInfo
+                return super().find_class(module, name)
 
-        Returns
-        -------
-        Dict[str, Any]
-            Nested annotations dictionary.
-        """
         file_path = os.path.join(save_path, "data.pkl")
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"Saved annotations file not found: {file_path}")
 
         with open(file_path, "rb") as f:
-            return pickle.load(f)
+            return FixedUnpickler(f).load()
