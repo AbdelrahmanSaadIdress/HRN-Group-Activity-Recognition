@@ -52,7 +52,7 @@ class RCRG_1R_1C_stage2(nn.Module):
         # (B, P, 2048)
         x = x.view(B, P, 2048)
         # (2, 132)
-        edge_index = torch.tensor([(i, j) for i, j in itertools.permutations(range(P), 2)]).t()
+        edge_index = torch.tensor([(i, j) for i, j in itertools.permutations(range(P), 2)]).t().to(x.device)
         # (B, P, output_channels)
         x = self.relational_unit(input_=x, edge_index=edge_index)
 
