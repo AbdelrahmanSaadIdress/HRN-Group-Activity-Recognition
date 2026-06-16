@@ -41,32 +41,85 @@ def get_transform(state: Literal["train", "val", "test"]):
 
 
 def get_dataloader(config: dict, state: Literal["train", "val", "test"]):
-    # B1-NoRelations
-    if config["About"]["name"] == "B1-NoRelations":
-        if config["About"]["level"] == "person":
-            video_path = config["Data"]["frames_annots_path"]
-            annot_path = os.path.join(config["Data"]["annotations_path"], "data.pkl")
-            seq = False
-            split = config["Modelling"]["data_splits"][state]
-            labels = person_activity_labels
-            weights_path = os.path.join(config["Data"]["weights_path"], config["Data"]["person_weights"], f"{state}_weights.pkl")
-            transform = get_transform(state)
-            repo_id = config['About']['repo_id']
 
-            dataset = Person_Activity_DataSet(
-                videos_path=video_path, 
-                annot_path=annot_path, 
-                seq=seq, 
-                split=split, 
-                labels=labels, 
-                transform=transform,
-                weights_path=weights_path,
-                huggingface_repo_id=repo_id
-            )
+    # Temporal Models
+    if config["About"].get("temporal", None):
+        video_path = config["Data"]["frames_annots_path"]
+        annot_path = os.path.join(config["Data"]["annotations_path"], "data.pkl")
+        seq = True
+        sort= True
+        split = config["Modelling"]["data_splits"][state]
+        labels = group_activity_labels
+        weights_path = os.path.join(config["Data"]["weights_path"], config["Data"]["group_weights"], f"{state}_weights.pkl")
+        transform = get_transform(state)
+        repo_id = config['About']['repo_id']
 
-            return dataset, person_collate_fn
-        
-        elif config["About"]["level"] == "group":
+        dataset = Group_Activity_DataSet(
+            videos_path=video_path, 
+            annot_path=annot_path, 
+            seq=seq, 
+            sort=sort,
+            split=split, 
+            labels=labels, 
+            transform=transform,
+            weights_path=weights_path,
+            huggingface_repo_id=repo_id
+        )
+
+        return dataset, group_collate_fn
+
+    else:
+        # B1-NoRelations
+        if config["About"]["name"] == "B1-NoRelations":
+            if config["About"]["level"] == "person":
+                video_path = config["Data"]["frames_annots_path"]
+                annot_path = os.path.join(config["Data"]["annotations_path"], "data.pkl")
+                seq = False
+                split = config["Modelling"]["data_splits"][state]
+                labels = person_activity_labels
+                weights_path = os.path.join(config["Data"]["weights_path"], config["Data"]["person_weights"], f"{state}_weights.pkl")
+                transform = get_transform(state)
+                repo_id = config['About']['repo_id']
+
+                dataset = Person_Activity_DataSet(
+                    videos_path=video_path, 
+                    annot_path=annot_path, 
+                    seq=seq, 
+                    split=split, 
+                    labels=labels, 
+                    transform=transform,
+                    weights_path=weights_path,
+                    huggingface_repo_id=repo_id
+                )
+
+                return dataset, person_collate_fn
+            
+            elif config["About"]["level"] == "group":
+                video_path = config["Data"]["frames_annots_path"]
+                annot_path = os.path.join(config["Data"]["annotations_path"], "data.pkl")
+                seq = False
+                sort=True
+                split = config["Modelling"]["data_splits"][state]
+                labels = group_activity_labels
+                weights_path = os.path.join(config["Data"]["weights_path"], config["Data"]["group_weights"], f"{state}_weights.pkl")
+                transform = get_transform(state)
+                repo_id = config['About']['repo_id']
+
+                dataset = Group_Activity_DataSet(
+                    videos_path=video_path, 
+                    annot_path=annot_path, 
+                    seq=seq, 
+                    sort=sort,
+                    split=split, 
+                    labels=labels, 
+                    transform=transform,
+                    weights_path=weights_path,
+                    huggingface_repo_id=repo_id
+                )
+
+                return dataset, group_collate_fn
+
+        if config["About"]["name"] in ["RCRG-1R-1C", "RCRG-1R-1C-untuned", "RCRG-2R-11C-conc", "RCRG-2R-11C", "RCRG-2R-21C-conc", "RCRG-2R-21C", "RCRG-3R-421C-conc", "RCRG-3R-421C"]:
             video_path = config["Data"]["frames_annots_path"]
             annot_path = os.path.join(config["Data"]["annotations_path"], "data.pkl")
             seq = False
@@ -90,28 +143,3 @@ def get_dataloader(config: dict, state: Literal["train", "val", "test"]):
             )
 
             return dataset, group_collate_fn
-
-    if config["About"]["name"] in ["RCRG-1R-1C", "RCRG-1R-1C-untuned", "RCRG-2R-11C-conc", "RCRG-2R-11C", "RCRG-2R-21C-conc", "RCRG-2R-21C", "RCRG-3R-421C-conc", "RCRG-3R-421C"]:
-        video_path = config["Data"]["frames_annots_path"]
-        annot_path = os.path.join(config["Data"]["annotations_path"], "data.pkl")
-        seq = False
-        sort=True
-        split = config["Modelling"]["data_splits"][state]
-        labels = group_activity_labels
-        weights_path = os.path.join(config["Data"]["weights_path"], config["Data"]["group_weights"], f"{state}_weights.pkl")
-        transform = get_transform(state)
-        repo_id = config['About']['repo_id']
-
-        dataset = Group_Activity_DataSet(
-            videos_path=video_path, 
-            annot_path=annot_path, 
-            seq=seq, 
-            sort=sort,
-            split=split, 
-            labels=labels, 
-            transform=transform,
-            weights_path=weights_path,
-            huggingface_repo_id=repo_id
-        )
-
-        return dataset, group_collate_fn

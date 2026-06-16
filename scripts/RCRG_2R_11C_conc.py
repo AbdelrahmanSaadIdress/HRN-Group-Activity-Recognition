@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-from models.single_frame_models import b1_norelations_stage1, RCRG_2R_11C_conc_stage2
 from DataSet.GetDataSet import get_dataloader
 from DataSet.activities import person_activity_clases, group_activity_clases
 from utils import Trainer, Tester, set_seed, load_checkpoint
@@ -19,6 +18,12 @@ def train_stage_two(
     stage1_checkpoint: str,
     checkpoint_path: str = None,
 ):
+    
+    if config["About"].get("temporal", None):
+        from models.temporal_models import b1_norelations_stage1, RCRG_2R_11C_conc_stage2
+    else:
+        from models.single_frame_models import b1_norelations_stage1, RCRG_2R_11C_conc_stage2
+        
     set_seed(config["Modelling"]["seed"])
     device = _device()
 
