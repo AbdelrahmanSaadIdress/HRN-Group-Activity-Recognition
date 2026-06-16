@@ -8,6 +8,8 @@ import numpy as np
 from torch.utils.data import Dataset
 from huggingface_hub import HfApi, get_token
 
+from AnnotationsExtraction.BoxInfo import BoxInfo
+
 class Person_Activity_DataSet(Dataset):
     def __init__(self, 
                 videos_path: str, annot_path: str, 
@@ -32,9 +34,16 @@ class Person_Activity_DataSet(Dataset):
         self.save_weights()
 
     def load_data(self):
+        from AnnotationsExtraction.BoxInfo import BoxInfo
+
+        class FixedUnpickler(pickle.Unpickler):
+            def find_class(self, module, name):
+                if name == 'BoxInfo':
+                    return BoxInfo
+                return super().find_class(module, name)
+
         with open(self.annot_path, "rb") as f:
-            data = pickle.load(f)
-        return data
+            return FixedUnpickler(f).load()
 
     def create_samples(self):
         samples = []
