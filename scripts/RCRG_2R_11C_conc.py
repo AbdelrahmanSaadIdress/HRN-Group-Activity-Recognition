@@ -19,7 +19,9 @@ def train_stage_two(
     checkpoint_path: str = None,
 ):
     
-    if config["About"].get("temporal", None):
+    if config["About"].get("attention", None):
+        from models.attention_models import b1_norelations_stage1, RCRG_2R_11C_conc_stage2
+    elif config["About"].get("temporal", None):
         from models.temporal_models import b1_norelations_stage1, RCRG_2R_11C_conc_stage2
     else:
         from models.single_frame_models import b1_norelations_stage1, RCRG_2R_11C_conc_stage2
