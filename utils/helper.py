@@ -186,7 +186,7 @@ def load_checkpoint(
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"  [Checkpoint] Loading: {ckpt_path}")
-    checkpoint = torch.load(ckpt_path, map_location=device)
+    checkpoint = torch.load(ckpt_path, map_location=device, weights_only=False)
 
     model.load_state_dict(checkpoint["model_state_dict"], strict=True)
 
