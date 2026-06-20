@@ -14,18 +14,21 @@ from .helper import save_checkpoint, load_checkpoint
 
 class Trainer:
     """
-    Professional trainer with full W&B integration.
+    Trainer with full W&B integration.
 
     Features
     --------
-    - Resumes the *same* W&B run when a checkpoint is available
+    - Single global_step axis for ALL W&B logging (no step collision)
+    - Resumes the same W&B run when a checkpoint is available
+    - global_step is saved/restored from checkpoint for seamless resumption
     - Per-batch and per-epoch metrics logged to W&B
     - Gradient histograms via wandb.watch
     - Weighted cross-entropy (wired from dataset.get_weights())
     - Gradient clipping (grad_clip in config)
     - Periodic checkpointing every save_every epochs
     - Saves best.pt whenever validation accuracy improves
-    - Confusion matrix logged as a W&B image each epoch
+    - Confusion matrix logged as a W&B plot each epoch
+    - Clean professional console output
     """
 
     def __init__(
@@ -34,7 +37,7 @@ class Trainer:
         model: nn.Module,
         optimizer,
         scaler,
-        dataloaders: list,          # [train_loader, val_loader]
+        dataloaders: list,               # [train_loader, val_loader]
         device: torch.device,
         scheduler=None,
         scheduler_type: str = "per epoch",   # "per epoch" | "per batch"
@@ -60,7 +63,7 @@ class Trainer:
         self.criterion = self._build_criterion()
 
         # ------------------------------------------------------------------
-        # Load checkpoint (if any) — also recovers wandb_run_id
+        # Load checkpoint (if any) — also recovers wandb_run_id & global_step
         # ------------------------------------------------------------------
         (
             self.start_epoch,
@@ -70,6 +73,7 @@ class Trainer:
             self.train_accuracies,
             self.val_accuracies,
             wandb_run_id,
+            self.global_step,
         ) = load_checkpoint(
             config, model, optimizer, scheduler, scaler,
             checkpoint_path=checkpoint_path,
@@ -95,6 +99,7 @@ class Trainer:
         # ------------------------------------------------------------------
         # Train
         # ------------------------------------------------------------------
+        self._print_training_header()
         self._train()
         self.run.finish()
 
@@ -103,40 +108,58 @@ class Trainer:
     # ------------------------------------------------------------------
 
     def _build_criterion(self):
-        """Build CrossEntropyLoss, optionally with class weights from dataset."""
-        use_weights = self.config["Modelling"].get("weighted_loss", False)
+        """Build CrossEntropyLoss, optionally with class weights from train dataset."""
+        use_weights  = self.config["Modelling"].get("weighted_loss", False)
         weight_tensor = None
 
         if use_weights:
             train_dataset = self.dataloaders[0].dataset
             if hasattr(train_dataset, "get_weights"):
-                counts = train_dataset.get_weights()          # dict {label_int: count}
+                counts      = train_dataset.get_weights()       # dict {label_int: count}
                 num_classes = len(counts)
                 counts_arr  = np.array([counts[i] for i in range(num_classes)], dtype=np.float32)
-                # inverse-frequency weights, normalised
-                weights     = 1.0 / (counts_arr + 1e-6)
-                weights     = weights / weights.sum() * num_classes
+
+                # Inverse-frequency weights, normalised
+                weights       = 1.0 / (counts_arr + 1e-6)
+                weights       = weights / weights.sum() * num_classes
                 weight_tensor = torch.tensor(weights, dtype=torch.float32).to(self.device)
-                print(f"Weighted loss enabled. Weights: {weight_tensor.cpu().numpy()}")
+
+                # ---- Clear class-weight table ----------------------------
+                print(f"\n  {'─'*52}")
+                print(f"  {'Class':<20} {'Count':>10} {'Weight':>10}")
+                print(f"  {'─'*52}")
+                for i in range(num_classes):
+                    name = self.class_names[i] if i < len(self.class_names) else str(i)
+                    print(f"  {name:<20} {int(counts_arr[i]):>10} {weights[i]:>10.4f}")
+                print(f"  {'─'*52}\n")
 
         return nn.CrossEntropyLoss(
-            weight=weight_tensor,
-            ignore_index=self.ignore_index,
+            weight       = weight_tensor,
+            ignore_index = self.ignore_index,
         )
 
-    def _log_confusion_matrix(self, y_true, y_pred, prefix: str, epoch: int):
-        cm = confusion_matrix(y_true, y_pred)
-        wandb.log(
-            {
-                f"{prefix}/confusion_matrix": wandb.plot.confusion_matrix(
-                    probs=None,
-                    y_true=y_true,
-                    preds=y_pred,
-                    class_names=self.class_names if self.class_names else None,
-                )
-            },
-            step=epoch,
-        )
+    def _print_training_header(self):
+        total_epochs = self.config["Modelling"]["epochs"]
+        print(f"\n{'='*60}")
+        print(f"  Training: {self.config['About']['name']}")
+        print(f"  Epochs  : {self.start_epoch + 1} -> {total_epochs}")
+        print(f"  Device  : {self.device}")
+        print(f"  W&B Run : {self.wandb_run_id}")
+        print(f"{'='*60}\n")
+
+    def _print_epoch_summary(self, epoch, total_epochs, train_loss, train_acc,
+                              val_loss, val_acc, f1, lr, is_best):
+        marker = "  ** NEW BEST **" if is_best else ""
+        print(f"\n  {'─'*56}")
+        print(f"  Epoch   : {epoch+1:03d} / {total_epochs:03d}{marker}")
+        print(f"  {'─'*56}")
+        print(f"  {'Metric':<18} {'Train':>12} {'Val':>12}")
+        print(f"  {'─'*56}")
+        print(f"  {'Loss':<18} {train_loss:>12.4f} {val_loss:>12.4f}")
+        print(f"  {'Accuracy (%)':<18} {train_acc:>12.2f} {val_acc:>12.2f}")
+        print(f"  {'F1 (weighted)':<18} {'':>12} {f1:>12.4f}")
+        print(f"  {'LR':<18} {lr:>12.2e}")
+        print(f"  {'─'*56}\n")
 
     # ------------------------------------------------------------------
     #  Train / Val loops
@@ -148,7 +171,12 @@ class Trainer:
         torch.cuda.empty_cache()
 
         train_loader = self.dataloaders[0]
-        pbar = tqdm(train_loader, desc=f"[Train] Epoch {epoch+1:03d}")
+        pbar = tqdm(
+            train_loader,
+            desc    = f"  [Train] Epoch {epoch+1:03d}",
+            ncols   = 80,
+            leave   = True,
+        )
 
         for batch_idx, (inputs, targets) in enumerate(pbar):
             inputs  = inputs.to(self.device)
@@ -177,21 +205,27 @@ class Trainer:
             total_loss += loss.item()
             predicted   = outputs.argmax(-1)
 
-            # ignore padded positions when computing accuracy
             mask     = targets.view(-1) != self.ignore_index
             correct += predicted.view(-1)[mask].eq(targets.view(-1)[mask]).sum().item()
             total   += mask.sum().item()
 
-            global_step = epoch * len(train_loader) + batch_idx
+            batch_acc = 100.0 * correct / max(total, 1)
+
+            # All W&B logging on one consistent global_step axis
             wandb.log(
                 {
                     "train/batch_loss": loss.item(),
-                    "train/batch_acc":  100.0 * correct / max(total, 1),
+                    "train/batch_acc":  batch_acc,
                 },
-                step=global_step,
+                step=self.global_step,
             )
 
-            pbar.set_postfix(loss=f"{loss.item():.4f}", acc=f"{100.*correct/max(total,1):.2f}%")
+            self.global_step += 1
+
+            pbar.set_postfix(
+                loss=f"{loss.item():.4f}",
+                acc =f"{batch_acc:.2f}%",
+            )
 
         epoch_loss = total_loss / len(train_loader)
         epoch_acc  = 100.0 * correct / max(total, 1)
@@ -204,7 +238,12 @@ class Trainer:
         torch.cuda.empty_cache()
 
         val_loader = self.dataloaders[1]
-        pbar = tqdm(val_loader, desc=f"[Val]   Epoch {epoch+1:03d}")
+        pbar = tqdm(
+            val_loader,
+            desc  = f"  [Val]   Epoch {epoch+1:03d}",
+            ncols = 80,
+            leave = True,
+        )
 
         with torch.no_grad():
             for inputs, targets in pbar:
@@ -247,7 +286,7 @@ class Trainer:
 
         for epoch in range(self.start_epoch, total_epochs):
 
-            train_loss, train_acc = self._train_one_epoch(epoch)
+            train_loss, train_acc              = self._train_one_epoch(epoch)
             val_loss, val_acc, f1, y_true, y_pred = self._val_one_epoch(epoch)
 
             self.train_losses.append(train_loss)
@@ -264,22 +303,26 @@ class Trainer:
             current_lr = self.optimizer.param_groups[0]["lr"]
             is_best    = val_acc > self.best_acc
 
-            # ---- W&B epoch-level logging --------------------------------
+            # ---- W&B epoch-level logging (same global_step axis) --------
             wandb.log(
                 {
-                    "epoch":            epoch + 1,
-                    "train/loss":       train_loss,
-                    "train/acc":        train_acc,
-                    "val/loss":         val_loss,
-                    "val/acc":          val_acc,
-                    "val/f1_weighted":  f1,
-                    "lr":               current_lr,
-                    "best_val_acc":     max(self.best_acc, val_acc),
+                    "epoch":           epoch + 1,
+                    "train/loss":      train_loss,
+                    "train/acc":       train_acc,
+                    "val/loss":        val_loss,
+                    "val/acc":         val_acc,
+                    "val/f1_weighted": f1,
+                    "lr":              current_lr,
+                    "best_val_acc":    max(self.best_acc, val_acc),
+                    "val/confusion_matrix": wandb.plot.confusion_matrix(
+                        probs      = None,
+                        y_true     = y_true,
+                        preds      = y_pred,
+                        class_names= self.class_names if self.class_names else None,
+                    ),
                 },
-                step=epoch,
+                step=self.global_step,
             )
-
-            self._log_confusion_matrix(y_true, y_pred, prefix="val", epoch=epoch)
 
             # ---- Checkpoint ---------------------------------------------
             save_checkpoint(
@@ -292,6 +335,7 @@ class Trainer:
                 val_loss         = val_loss,
                 config           = self.config,
                 wandb_run_id     = self.wandb_run_id,
+                global_step      = self.global_step,
                 is_best          = is_best,
                 train_losses     = self.train_losses,
                 val_losses       = self.val_losses,
@@ -301,13 +345,14 @@ class Trainer:
 
             if is_best:
                 self.best_acc = val_acc
-                print(f"New best: {self.best_acc:.2f}%")
 
-            print(
-                f"Epoch {epoch+1:03d}/{total_epochs} | "
-                f"Train loss={train_loss:.4f} acc={train_acc:.2f}% | "
-                f"Val loss={val_loss:.4f} acc={val_acc:.2f}% f1={f1:.4f} | "
-                f"LR={current_lr:.2e}"
+            self._print_epoch_summary(
+                epoch, total_epochs,
+                train_loss, train_acc,
+                val_loss, val_acc,
+                f1, current_lr, is_best,
             )
 
-        print("Training complete.")
+        print(f"\n{'='*60}")
+        print(f"  Training complete.  Best val_acc = {self.best_acc:.2f}%")
+        print(f"{'='*60}\n")

@@ -17,7 +17,9 @@ def load_config(config_path: str) -> dict:
         raise FileNotFoundError(f"Config file not found: {config_path}")
     with open(config_path, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
-    print(f"Loaded config from: {config_path}")
+    print(f"{'='*60}")
+    print(f"  Config loaded: {config_path}")
+    print(f"{'='*60}")
     return config
 
 
@@ -32,7 +34,41 @@ def set_seed(seed: int) -> None:
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-    print(f"Seed set to: {seed}")
+    print(f"  Seed set to: {seed}")
+
+
+# ==============================================================
+#               HUGGINGFACE UPLOAD HELPER
+# ==============================================================
+def upload_to_huggingface(local_path: str, repo_id: str, repo_filename: str) -> None:
+    """
+    Upload a file to a HuggingFace repository.
+
+    Parameters
+    ----------
+    local_path : str
+        Local path to the file to upload.
+    repo_id : str
+        HuggingFace repository ID (e.g. 'username/repo-name').
+    repo_filename : str
+        Target filename inside the repository.
+    """
+    try:
+        from huggingface_hub import HfApi, get_token
+        token = get_token()
+        if token is None:
+            print(f"  [HuggingFace] WARNING: No token found. Skipping upload of {repo_filename}.")
+            return
+        api = HfApi()
+        api.upload_file(
+            path_or_fileobj=local_path,
+            path_in_repo=repo_filename,
+            repo_id=repo_id,
+            token=token,
+        )
+        print(f"  [HuggingFace] Uploaded: {repo_filename} -> {repo_id}")
+    except Exception as e:
+        print(f"  [HuggingFace] Upload failed for {repo_filename}: {e}")
 
 
 # ==============================================================
@@ -48,6 +84,7 @@ def save_checkpoint(
     val_loss: float,
     config: dict,
     wandb_run_id: str,
+    global_step: int,
     is_best: bool = False,
     train_losses: list = None,
     val_losses: list = None,
@@ -57,7 +94,8 @@ def save_checkpoint(
     """
     Save checkpoint every `save_every` epochs as epoch_XXX.pt.
     Always save best.pt when is_best=True.
-    Both files store wandb_run_id for run resumption.
+    Both files store wandb_run_id and global_step for full run resumption.
+    Uploads both files to HuggingFace if repo_id is set in config.
     """
     train_losses      = train_losses      or []
     val_losses        = val_losses        or []
@@ -67,8 +105,11 @@ def save_checkpoint(
     save_dir = Path(config["Data"]["root"]) / config["About"]["models_folder"]
     save_dir.mkdir(parents=True, exist_ok=True)
 
+    repo_id = config["About"].get("repo_id", None)
+
     checkpoint = {
         "epoch":                epoch,
+        "global_step":          global_step,
         "model_state_dict":     model.state_dict(),
         "optimizer_state_dict": optimizer.state_dict(),
         "scheduler_state_dict": scheduler.state_dict() if scheduler else None,
@@ -84,14 +125,19 @@ def save_checkpoint(
 
     save_every = config["Modelling"].get("save_every", 5)
     if (epoch + 1) % save_every == 0:
-        epoch_path = save_dir / f"epoch_{epoch+1:03d}.pt"
+        epoch_filename = f"epoch_{epoch+1:03d}.pt"
+        epoch_path = save_dir / epoch_filename
         torch.save(checkpoint, epoch_path)
-        print(f"Checkpoint saved: {epoch_path}")
+        print(f"  [Checkpoint] Saved: {epoch_path}")
+        if repo_id:
+            upload_to_huggingface(str(epoch_path), repo_id, epoch_filename)
 
     if is_best:
         best_path = save_dir / "best.pt"
         torch.save(checkpoint, best_path)
-        print(f"Best model saved: {best_path}  (acc={val_acc:.4f})")
+        print(f"  [Checkpoint] Best model saved: {best_path}  (val_acc={val_acc:.4f}%)")
+        if repo_id:
+            upload_to_huggingface(str(best_path), repo_id, "best.pt")
 
 
 def load_checkpoint(
@@ -105,14 +151,15 @@ def load_checkpoint(
 ):
     """
     Load a checkpoint. Resolution order:
-        1. Explicit `checkpoint_path` argument  →  load that file
-        2. test=True or preload='best'          →  load best.pt
-        3. preload='cont'                       →  load latest epoch_XXX.pt
-        4. Nothing found                        →  start fresh
+        1. Explicit `checkpoint_path` argument  ->  load that file
+        2. test=True or preload='best'          ->  load best.pt
+        3. preload='cont'                       ->  load latest epoch_XXX.pt
+        4. Nothing found                        ->  start fresh
 
     Returns
     -------
-    epoch, val_acc, train_losses, val_losses, train_accuracies, val_accuracies, wandb_run_id
+    epoch, val_acc, train_losses, val_losses, train_accuracies, val_accuracies,
+    wandb_run_id, global_step
     """
     checkpoints_dir = Path(config["Data"]["root"]) / config["About"]["models_folder"]
     checkpoints_dir.mkdir(parents=True, exist_ok=True)
@@ -134,24 +181,24 @@ def load_checkpoint(
                 ckpt_path = epoch_ckpts[-1]
 
     if not ckpt_path or not Path(ckpt_path).exists():
-        print("No checkpoint found — starting fresh.")
-        return 0, 0.0, [], [], [], [], None
+        print(f"  [Checkpoint] No checkpoint found — starting fresh.")
+        return 0, 0.0, [], [], [], [], None, 0
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"Loading checkpoint: {ckpt_path}")
+    print(f"  [Checkpoint] Loading: {ckpt_path}")
     checkpoint = torch.load(ckpt_path, map_location=device)
 
     model.load_state_dict(checkpoint["model_state_dict"], strict=True)
 
     if optimizer and checkpoint.get("optimizer_state_dict"):
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        print("Optimizer restored.")
+        print(f"  [Checkpoint] Optimizer restored.")
     if scheduler and checkpoint.get("scheduler_state_dict"):
         scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
-        print("Scheduler restored.")
+        print(f"  [Checkpoint] Scheduler restored.")
     if scaler and checkpoint.get("scaler_state_dict"):
         scaler.load_state_dict(checkpoint["scaler_state_dict"])
-        print("Scaler restored.")
+        print(f"  [Checkpoint] Scaler restored.")
 
     epoch            = checkpoint.get("epoch", 0)
     val_acc          = checkpoint.get("val_acc", 0.0)
@@ -160,6 +207,7 @@ def load_checkpoint(
     train_accuracies = checkpoint.get("train_accuracies", [])
     val_accuracies   = checkpoint.get("val_accuracies", [])
     wandb_run_id     = checkpoint.get("wandb_run_id", None)
+    global_step      = checkpoint.get("global_step", 0)
 
-    print(f"Resumed from epoch {epoch}  (val_acc={val_acc:.4f})  wandb_run_id={wandb_run_id}")
-    return epoch, val_acc, train_losses, val_losses, train_accuracies, val_accuracies, wandb_run_id
+    print(f"  [Checkpoint] Resumed from epoch {epoch + 1}  |  val_acc={val_acc:.4f}%  |  global_step={global_step}  |  wandb_run_id={wandb_run_id}")
+    return epoch + 1, val_acc, train_losses, val_losses, train_accuracies, val_accuracies, wandb_run_id, global_step
