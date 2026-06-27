@@ -74,8 +74,8 @@ class RCRG_2R_11C_conc_stage2(nn.Module):
         # (2, 132)
         edge_index = torch.tensor([(i, j) for i, j in itertools.permutations(range(P), 2)]).t().to(x.device)
         # (B*S, P, output_channels_i)
-        x_1 = self.relational_unit_one(input_=x, edge_index=edge_index)
-        x_2 = self.relational_unit_two(input_=x, edge_index=edge_index)
+        x_1 = self.relational_unit_one(x=x, edge_index=edge_index)
+        x_2 = self.relational_unit_two(x=x, edge_index=edge_index)
         # (B*S, P, (output_channels_1+output_channels_2))
         x = torch.cat([x_1, x_2], dim=2)
 
