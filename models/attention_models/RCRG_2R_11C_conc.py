@@ -20,8 +20,8 @@ class RCRG_2R_11C_conc_stage2(nn.Module):
         for param in self.stage1.parameters():
             param.requires_grad = False 
         
-        self.relational_unit_one = RelationLayer(in_channels, hidden_channels, output_channels[0])
-        self.relational_unit_two = RelationLayer(in_channels, hidden_channels, output_channels[1])
+        self.relational_unit_one = RelationLayer(in_channels, hidden_size=hidden_channels, out_channels=output_channels[0])
+        self.relational_unit_two = RelationLayer(in_channels, hidden_size=hidden_channels, out_channels=output_channels[1])
         
         self.lstm1 = nn.LSTM(
             input_size=2048,
@@ -68,7 +68,7 @@ class RCRG_2R_11C_conc_stage2(nn.Module):
         x = x.view(B*P, S, -1 )
         # (B*P, S, 1024)
         x, (h, c) = self.lstm1(x)   
-        # (B*S, p, 2048)
+        # (B*S, p, 1024)
         x = x.contiguous().view(B*S, P, -1 )
 
         # (2, 132)
