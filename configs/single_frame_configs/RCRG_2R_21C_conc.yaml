@@ -1,0 +1,39 @@
+About:
+  name: "RCRG-2R-21C-conc"
+  description: "Close to the RCRG-1R-1C variant, but uses 2 relational layers (2R) of sizes 256 and 128. The graphs of these 2 layers are 1 clique (11C) of all people. This variant and the next ones explore stacking layers with different graph structures."
+  level: "group"
+  project_name: "HRN-GAR"          # W&B project name
+  repo_id: "AbdoSaad24/B4_stage2_RCRG_2R_21C_conc"    # HuggingFace repo
+  models_folder: "checkpoints/stage2"
+  preload: "from_start"             # from_start | cont | best
+           
+Modelling:
+  seed: 42
+  num_classes: 8                    # group activity classes
+  stage1_num_classes: 9             # needed to build the stage1 shell
+  in_channels: 2048
+  hidden_channels: 512
+  output_channels: [128,128]
+  batch_size: 128
+  epochs: 40
+  lr: 0.0004
+  weight_decay: 0.005
+  lr_patience: 3
+  grad_clip: 1.0
+  weighted_loss: true
+  freeze_backbone: true             # freeze stage1 backbone weights
+  save_every: 5
+  num_workers: 4
+  data_splits:
+    train: [1, 3, 6, 7, 10, 13, 15, 16, 18, 22, 23, 31, 32, 36, 38, 39, 40, 41, 42, 48, 50, 52, 53, 54]
+    val: [0, 2, 8, 12, 17, 19, 24, 26, 27, 28, 30, 33, 46, 49, 51]
+    test: [4, 5, 9, 11, 14, 20, 21, 25, 29, 34, 35, 37, 43, 44, 45, 47]
+
+Data:
+  root: "/kaggle/working/Group-Activity-Recognition/src/Outputs/Part2"
+  crops_annots_path: "/kaggle/input/datasets/ahmedmohamed365/volleyball/volleyball_tracking_annotation/volleyball_tracking_annotation"
+  frames_annots_path:  "/kaggle/input/datasets/ahmedmohamed365/volleyball/volleyball_/videos"
+  annotations_path: "/kaggle/input/datasets/abdelrhmansaadidrees/annotations"
+  weights_path: "/kaggle/working/dataset/weights"
+  person_weights: "person_weights"
+  group_weights: "group_weights"

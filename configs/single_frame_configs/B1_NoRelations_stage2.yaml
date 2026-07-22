@@ -1,0 +1,36 @@
+About:
+  name: "B1-NoRelations"
+  description: "Stage 2: Team-aware pooling head for group activity classification (8 classes)."
+  level: "group"
+  project_name: "HRN-GAR"          # W&B project name
+  repo_id: "AbdoSaad24/HRN_GAR"    # HuggingFace repo
+  models_folder: "checkpoints/stage2"
+  preload: "from_start"             # from_start | cont | best
+
+Modelling:
+  seed: 42
+  num_classes: 8                    # group activity classes
+  stage1_num_classes: 9             # needed to build the stage1 shell
+  batch_size: 1
+  epochs: 2
+  lr: 0.005
+  weight_decay: 0.005
+  lr_patience: 3
+  grad_clip: 1.0
+  weighted_loss: true
+  freeze_backbone: true             # freeze stage1 backbone weights
+  save_every: 5
+  num_workers: 4
+  data_splits:
+    train: [48, 50, 52, 53, 54]
+    val: [46, 49, 51]
+    test: [45, 47]
+
+Data:
+  root: "Outputs"
+  crops_annots_path: "datasetttt/volleyball_tracking_annotation/volleyball_tracking_annotation"
+  frames_annots_path: "datasetttt/volleyball_/videos"
+  annotations_path: "datasetttt/annotations"
+  weights_path: "datasetttt/weights"
+  person_weights: "person_weights"
+  group_weights: "group_weights"

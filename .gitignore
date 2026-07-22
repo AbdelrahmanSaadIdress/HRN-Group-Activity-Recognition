@@ -223,6 +223,6 @@ __marimo__/
 # README.md
 datasetttt/
 # assets/
-configs/*
+# configs/*
 wandb/
 # Outputs/*
