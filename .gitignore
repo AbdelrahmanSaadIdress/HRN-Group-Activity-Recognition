@@ -219,10 +219,10 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-requirements.txt
-README.md
+# requirements.txt
+# README.md
 datasetttt/
-assets/
+# assets/
 configs/*
 wandb/
 Outputs/*
